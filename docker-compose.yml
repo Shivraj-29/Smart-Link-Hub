@@ -1,0 +1,43 @@
+# Local dev / staging parity setup. Mirrors what you'll run in AWS:
+# an app container talking to a managed Postgres (RDS in AWS, this
+# container locally). Not meant for production use as-is.
+#
+# Usage:
+#   cp .env.example .env   # then edit JWT_SECRET etc.
+#   docker compose up --build
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: smartlinkhub
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/smartlinkhub
+      JWT_SECRET: ${JWT_SECRET:-dev-only-change-me}
+      FRONTEND_URL: ${FRONTEND_URL:-}
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  pgdata:
